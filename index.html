@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบบริหารจัดการข้อมูลผู้ป่วย</title>
+
+    <!-- Libraries -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <style>
+        /* (ใช้ Style เดิมจากเวอร์ชันก่อนหน้า เพื่อความต่อเนื่องของ Theme) */
+        :root {
+            --primary-pastel: #64b5f6;
+            --primary-hover: #42a5f5;
+            --secondary-pastel: #e3f2fd;
+            --bg-color: #f8fbff;
+            --text-dark: #455a64;
+            --text-light: #78909c;
+            --card-shadow: 0 8px 20px rgba(100, 181, 246, 0.1);
+            --sidebar-width: 260px;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            font-family: 'Sarabun', sans-serif;
+            color: var(--text-dark);
+            overflow-x: hidden;
+        }
+        
+        /* ... (CSS Login & Layout เดิม) ... */
+        #login-section { height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #e3f2fd 0%, #ffffff 100%); }
+        .login-card { background: white; border-radius: 24px; padding: 3rem; width: 100%; max-width: 420px; box-shadow: 0 20px 40px rgba(0,0,0,0.08); text-align: center; }
+        
+        #app-section { display: flex; min-height: 100vh; }
+        .sidebar { width: var(--sidebar-width); background: white; padding: 2rem 1rem; position: fixed; height: 100vh; box-shadow: 4px 0 20px rgba(0,0,0,0.02); transition: all 0.3s ease; z-index: 1000; }
+        .main-content { flex: 1; margin-left: var(--sidebar-width); padding: 2rem; transition: all 0.3s ease; }
+        
+        .nav-link { color: var(--text-light); padding: 14px 20px; margin-bottom: 8px; border-radius: 12px; display: flex; align-items: center; font-weight: 500; transition: all 0.2s; cursor: pointer; text-decoration: none;}
+        .nav-link:hover, .nav-link.active { background-color: var(--secondary-pastel); color: var(--primary-hover); transform: translateX(5px); }
+        .nav-link i { width: 24px; margin-right: 12px; font-size: 1.1rem; }
+
+        .custom-card { background: white; border-radius: 20px; border: none; padding: 1.5rem; box-shadow: var(--card-shadow); height: 100%; transition: transform 0.2s; }
+        .stat-card { color: white; overflow: hidden; position: relative; }
+        .stat-card.blue { background: linear-gradient(135deg, #64b5f6, #42a5f5); }
+        .stat-card.green { background: linear-gradient(135deg, #81c784, #66bb6a); }
+        .stat-card.orange { background: linear-gradient(135deg, #ffb74d, #ffa726); }
+        .stat-icon-bg { position: absolute; right: -10px; bottom: -10px; font-size: 5rem; opacity: 0.2; transform: rotate(-15deg); }
+
+        .btn-main { background-color: var(--primary-pastel); color: white; border: none; border-radius: 50px; padding: 10px 30px; font-weight: 600; transition: all 0.3s; box-shadow: 0 4px 12px rgba(100, 181, 246, 0.4); }
+        .btn-main:hover { background-color: var(--primary-hover); color: white; transform: translateY(-2px); }
+        .btn-icon-only { padding: 8px 12px; border-radius: 12px; }
+
+        .form-control, .form-select { border-radius: 12px; padding: 12px 15px; border: 1px solid #e0e0e0; background-color: #fcfcfc; }
+        .form-control:focus, .form-select:focus { box-shadow: 0 0 0 3px rgba(100, 181, 246, 0.2); border-color: var(--primary-pastel); }
+
+        /* Table */
+        .table-custom { width: 100%; border-collapse: separate; border-spacing: 0 8px; }
+        .table-custom tr { background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.02); }
+        .table-custom td, .table-custom th { padding: 15px; border: none; vertical-align: middle; }
+        .table-custom td:first-child, .table-custom th:first-child { border-radius: 12px 0 0 12px; }
+        .table-custom td:last-child, .table-custom th:last-child { border-radius: 0 12px 12px 0; }
+
+        .badge-status { padding: 6px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 500; }
+        .bg-admit { background-color: #e8f5e9; color: #2e7d32; }
+        .bg-discharge { background-color: #fff3e0; color: #ef6c00; }
+
+        .hidden { display: none !important; }
+        .fade-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        @media (max-width: 768px) {
+            .sidebar { transform: translateX(-100%); width: 260px; }
+            .sidebar.active { transform: translateX(0); }
+            .main-content { margin-left: 0; }
+            .mobile-toggle { display: block !important; }
+        }
+        .mobile-toggle { display: none; position: fixed; top: 15px; left: 15px; z-index: 1001; }
+    </style>
+</head>
+<body>
+
+    <!-- Toggle Button -->
+    <button class="btn btn-light shadow-sm mobile-toggle rounded-circle" onclick="toggleSidebar()">
+        <i class="fa-solid fa-bars text-primary"></i>
+    </button>
+
+    <!-- ================= 1. Login Section ================= -->
+    <div id="login-section">
+        <div class="login-card fade-in">
+            <div class="mb-4">
+                <div class="bg-light rounded-circle d-inline-flex p-3 mb-3">
+                    <i class="fa-solid fa-user-doctor fa-3x text-primary"></i>
+                </div>
+                <h3 class="fw-bold text-dark">PMS Login</h3>
+                <p class="text-muted small">ระบบบันทึกข้อมูลผู้ป่วย</p>
+            </div>
+            <form id="loginForm" onsubmit="handleLogin(event)">
+                <div class="mb-3 text-start">
+                    <label class="form-label ms-1 text-muted small">Username</label>
+                    <input type="text" class="form-control" id="username" placeholder="ระบุชื่อผู้ใช้งาน" required>
+                </div>
+                <div class="mb-4 text-start">
+                    <label class="form-label ms-1 text-muted small">Password</label>
+                    <input type="password" class="form-control" id="password" placeholder="ระบุรหัสผ่าน" required>
+                </div>
+                <button type="submit" class="btn btn-main w-100">เข้าสู่ระบบ</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ================= 2. App Section ================= -->
+    <div id="app-section" class="hidden">
+        <!-- Sidebar -->
+        <nav class="sidebar" id="sidebar">
+            <div class="text-center mb-5">
+                <i class="fa-solid fa-heart-pulse fa-2x text-primary"></i>
+                <h5 class="mt-2 fw-bold" style="color: var(--primary-pastel);">PMS System</h5>
+            </div>
+            <div class="nav flex-column px-2">
+                <a class="nav-link active" onclick="showPage('dashboard')"><i class="fa-solid fa-chart-pie"></i> แดชบอร์ด</a>
+                <a class="nav-link" onclick="showPage('record')"><i class="fa-solid fa-file-medical"></i> บันทึกข้อมูล</a>
+                <a class="nav-link" onclick="showPage('settings')"><i class="fa-solid fa-sliders"></i> ตั้งค่าระบบ</a>
+            </div>
+            <div class="mt-auto px-2 pt-5">
+                <div class="p-3 bg-light rounded-4 mb-3 text-center">
+                    <small class="text-muted d-block">ผู้ใช้งานปัจจุบัน</small>
+                    <span class="fw-bold text-primary" id="currentUserDisplay">Admin</span>
+                </div>
+                <a class="nav-link text-danger" onclick="logout()"><i class="fa-solid fa-power-off"></i> ออกจากระบบ</a>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            
+            <!-- A. Dashboard Page -->
+            <div id="page-dashboard" class="fade-in">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h3 class="fw-bold m-0">ภาพรวมข้อมูล</h3>
+                    <span class="text-muted small"><i class="fa-regular fa-calendar me-1"></i> <span id="currentDateDisplay"></span></span>
+                </div>
+
+                <div class="row g-4 mb-4">
+                    <div class="col-md-4">
+                        <div class="custom-card stat-card blue d-flex flex-column justify-content-between">
+                            <div>
+                                <p class="mb-1 opacity-75">ผู้ป่วยทั้งหมด</p>
+                                <h2 class="fw-bold display-5" id="stat-total">0</h2>
+                            </div>
+                            <i class="fa-solid fa-hospital-user stat-icon-bg"></i>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="custom-card stat-card green d-flex flex-column justify-content-between">
+                            <div>
+                                <p class="mb-1 opacity-75">รับใหม่ (Admit)</p>
+                                <h2 class="fw-bold display-5" id="stat-admit">0</h2>
+                            </div>
+                            <i class="fa-solid fa-bed-pulse stat-icon-bg"></i>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="custom-card stat-card orange d-flex flex-column justify-content-between">
+                            <div>
+                                <p class="mb-1 opacity-75">จำหน่าย (Discharge)</p>
+                                <h2 class="fw-bold display-5" id="stat-discharge">0</h2>
+                            </div>
+                            <i class="fa-solid fa-person-walking-luggage stat-icon-bg"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-4">
+                    <div class="col-lg-8">
+                        <div class="custom-card">
+                            <h5 class="fw-bold mb-4 text-dark">สถิติรายเดือน</h5>
+                            <div style="position: relative; height: 300px; width: 100%;">
+                                <canvas id="mainChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="custom-card">
+                            <h5 class="fw-bold mb-4 text-dark">สัดส่วนแผนก/โรค</h5>
+                            <div style="position: relative; height: 300px; width: 100%;">
+                                <canvas id="pieChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- B. Record Page (Dynamic Form) -->
+            <div id="page-record" class="hidden fade-in">
+                <h3 class="fw-bold mb-4">บันทึกข้อมูลผู้ป่วย</h3>
+                
+                <div class="custom-card mb-4">
+                    <form id="recordForm" onsubmit="handleSaveRecord(event)">
+                        <h6 class="text-primary fw-bold mb-3 text-uppercase"><i class="fa-solid fa-pen-to-square me-2"></i>รายละเอียด</h6>
+                        
+                        <!-- Dynamic Fields Container -->
+                        <div class="row g-3" id="formFieldsContainer">
+                            <!-- Fields will be injected here by JS -->
+                        </div>
+
+                        <div class="col-12 text-end mt-4">
+                            <button type="reset" class="btn btn-light rounded-pill px-4 me-2">ล้างค่า</button>
+                            <button type="submit" class="btn btn-main"><i class="fa-solid fa-save me-2"></i>บันทึกข้อมูล</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold m-0">รายการล่าสุด</h5>
+                    <button class="btn btn-sm btn-outline-primary rounded-pill" onclick="updateRecentTable()"><i class="fa-solid fa-rotate-right"></i> รีเฟรช</button>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-custom" id="recentTable">
+                        <thead class="text-secondary small" id="recentTableHead">
+                            <!-- Header will be dynamic -->
+                        </thead>
+                        <tbody>
+                            <!-- Data -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- C. Settings Page -->
+            <div id="page-settings" class="hidden fade-in">
+                <h3 class="fw-bold mb-4">ตั้งค่าระบบ</h3>
+                
+                <div class="row g-4">
+                    <!-- 1. Form Field Management (New) -->
+                    <div class="col-12">
+                        <div class="custom-card bg-light border-0">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h5 class="fw-bold m-0 text-primary"><i class="fa-solid fa-list-check me-2"></i>จัดการแบบฟอร์ม (Form Fields)</h5>
+                                <button class="btn btn-sm btn-primary" onclick="addCustomField()">+ เพิ่มหัวข้อ</button>
+                            </div>
+                            <p class="text-muted small">กำหนดหัวข้อที่ต้องการให้แสดงในหน้าบันทึกข้อมูล คุณสามารถเพิ่มหรือลบหัวข้อได้ตามต้องการ</p>
+                            
+                            <div class="table-responsive bg-white rounded shadow-sm p-3">
+                                <table class="table table-hover mb-0" id="fieldsTable">
+                                    <thead>
+                                        <tr>
+                                            <th>ชื่อหัวข้อ (Label)</th>
+                                            <th>ชื่อตัวแปร (Key)</th>
+                                            <th>ประเภท</th>
+                                            <th class="text-end">จัดการ</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="fieldsList">
+                                        <!-- Fields List -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 2. User Management -->
+                    <div class="col-lg-6">
+                        <div class="custom-card h-100">
+                            <div class="d-flex justify-content-between align-items-center mb-4">
+                                <h5 class="fw-bold m-0"><i class="fa-solid fa-users-gear text-primary me-2"></i>ผู้ใช้งาน (Users)</h5>
+                                <button class="btn btn-sm btn-outline-primary" onclick="openUserModal()">+ เพิ่ม</button>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-custom" id="usersTable">
+                                    <thead class="text-secondary small"><tr><th>ชื่อ</th><th>User</th><th class="text-end">Action</th></tr></thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 3. Category Management (For Dropdown Type) -->
+                    <div class="col-lg-6">
+                        <div class="custom-card h-100">
+                            <h5 class="fw-bold mb-4"><i class="fa-solid fa-tags text-primary me-2"></i>ตัวเลือกแผนก (Dropdown Options)</h5>
+                            <div class="input-group mb-3">
+                                <input type="text" class="form-control" id="newCategory" placeholder="ชื่อแผนกใหม่">
+                                <button class="btn btn-primary" onclick="addCategory()">เพิ่ม</button>
+                            </div>
+                            <div style="max-height: 200px; overflow-y: auto;">
+                                <ul class="list-group list-group-flush border-0" id="categoryList"></ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Logic Script -->
+    <script>
+        // ---------------- Configuration ----------------
+        const IS_GAS_ENV = false; // ** เปลี่ยนเป็น TRUE เมื่อใช้ใน Google Apps Script **
+
+        // Data Storage
+        let appData = {
+            // หัวข้อมาตรฐานที่ระบบต้องมี (System Fields)
+            systemFields: [
+                { id: 'sys_date', label: 'วันที่ทำรายการ', key: 'date', type: 'date', col: 4, required: true },
+                { id: 'sys_month', label: 'เดือน (Report)', key: 'month', type: 'month', col: 4, required: true },
+                { id: 'sys_hn', label: 'HN ผู้ป่วย', key: 'hn', type: 'text', col: 4, required: true },
+                { id: 'sys_name', label: 'ชื่อ-นามสกุล', key: 'name', type: 'text', col: 6, required: true },
+                { id: 'sys_status', label: 'สถานะ', key: 'status', type: 'select_status', col: 3, required: true },
+                { id: 'sys_type', label: 'แผนก/โรค', key: 'type', type: 'select_cat', col: 3, required: true }
+            ],
+            // หัวข้อที่ผู้ใช้เพิ่มเอง (Custom Fields)
+            customFields: [
+                { id: 1700000001, label: 'หมายเหตุ', key: 'remark', type: 'text', col: 12, required: false }
+            ],
+            records: [
+                { date: '2023-10-01', month: '2023-10', hn: '66001', name: 'คุณสมชาย', status: 'Admit', type: 'อายุรกรรม' },
+                { date: '2023-10-02', month: '2023-10', hn: '66002', name: 'คุณสมหญิง', status: 'Discharge', type: 'ศัลยกรรม' }
+            ],
+            categories: ['อายุรกรรม', 'ศัลยกรรม', 'สูตินารีเวช', 'กุมารเวชกรรม', 'ออร์โธปิดิกส์'],
+            users: [
+                { id: 1, username: 'admin', password: '123', name: 'Admin Nurse' }
+            ]
+        };
+
+        let currentUser = null;
+        let mainChartInstance = null;
+        let pieChartInstance = null;
+
+        // ---------------- Initialization ----------------
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!IS_GAS_ENV) {
+                const stored = localStorage.getItem('pms_db_v2');
+                if (stored) appData = JSON.parse(stored);
+            }
+            // Render Initial Views
+            initDateFields();
+            
+            // Render Form based on fields
+            renderRecordForm();
+            
+            // Date Display
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            document.getElementById('currentDateDisplay').innerText = new Date().toLocaleDateString('th-TH', options);
+        });
+
+        function saveLocal() {
+            if (!IS_GAS_ENV) localStorage.setItem('pms_db_v2', JSON.stringify(appData));
+        }
+
+        function initDateFields() {
+            // Helper to find input by key in the dynamic form
+            setTimeout(() => {
+                const dateInput = document.querySelector('input[name="date"]');
+                const monthInput = document.querySelector('input[name="month"]');
+                if(dateInput) dateInput.valueAsDate = new Date();
+                if(monthInput) monthInput.value = new Date().toISOString().slice(0, 7);
+            }, 100);
+        }
+
+        // ---------------- Navigation ----------------
+        function showPage(pageId) {
+            document.querySelectorAll('#app-section > main > div').forEach(div => div.classList.add('hidden'));
+            document.getElementById(`page-${pageId}`).classList.remove('hidden');
+            
+            // Menu Active State
+            document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+            const activeLink = document.querySelector(`.nav-link[onclick="showPage('${pageId}')"]`);
+            if(activeLink) activeLink.classList.add('active');
+
+            if(window.innerWidth < 768) document.getElementById('sidebar').classList.remove('active');
+
+            // Page Logic
+            if(pageId === 'dashboard') updateDashboard();
+            if(pageId === 'record') { renderRecordForm(); updateRecentTable(); }
+            if(pageId === 'settings') {
+                renderFieldsTable();
+                renderUserTable();
+                renderCategoryList();
+            }
+        }
+
+        function toggleSidebar() { document.getElementById('sidebar').classList.toggle('active'); }
+
+        // ---------------- Authentication ----------------
+        function handleLogin(e) {
+            e.preventDefault();
+            const u = document.getElementById('username').value;
+            const p = document.getElementById('password').value;
+            const foundUser = appData.users.find(user => user.username === u && user.password === p);
+
+            if (foundUser) {
+                currentUser = foundUser;
+                Swal.fire({ icon: 'success', title: `ยินดีต้อนรับ ${foundUser.name}`, timer: 1000, showConfirmButton: false }).then(() => {
+                    document.getElementById('login-section').classList.add('hidden');
+                    document.getElementById('app-section').classList.remove('hidden');
+                    document.getElementById('currentUserDisplay').innerText = currentUser.name;
+                    showPage('dashboard');
+                });
+            } else {
+                Swal.fire('Error', 'Username/Password ผิดพลาด', 'error');
+            }
+        }
+        function logout() { location.reload(); }
+
+        // ---------------- Dynamic Form Logic (Key Feature) ----------------
+        function renderRecordForm() {
+            const container = document.getElementById('formFieldsContainer');
+            container.innerHTML = '';
+
+            // Combine System fields and Custom fields
+            const allFields = [...appData.systemFields, ...appData.customFields];
+
+            allFields.forEach(field => {
+                let inputHtml = '';
+                
+                if (field.type === 'select_status') {
+                    inputHtml = `
+                        <select class="form-select" name="${field.key}" required>
+                            <option value="Admit">รับใหม่ (Admit)</option>
+                            <option value="Discharge">จำหน่าย (Discharge)</option>
+                        </select>`;
+                } else if (field.type === 'select_cat') {
+                    // Populate from categories
+                    let options = appData.categories.map(c => `<option value="${c}">${c}</option>`).join('');
+                    inputHtml = `<select class="form-select" name="${field.key}" required><option value="" disabled selected>เลือก...</option>${options}</select>`;
+                } else {
+                    // Standard inputs (text, date, month, number)
+                    inputHtml = `<input type="${field.type}" class="form-control" name="${field.key}" ${field.required ? 'required' : ''} placeholder="${field.label}">`;
+                }
+
+                const div = document.createElement('div');
+                div.className = `col-md-${field.col || 6}`;
+                div.innerHTML = `
+                    <label class="form-label small text-muted">${field.label}</label>
+                    ${inputHtml}
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        // ---------------- Field Management (Settings) ----------------
+        function renderFieldsTable() {
+            const list = document.getElementById('fieldsList');
+            list.innerHTML = '';
+            
+            // Show Custom Fields Only for editing (System fields are read-only conceptually here)
+            appData.customFields.forEach((field, index) => {
+                list.innerHTML += `
+                    <tr>
+                        <td>${field.label}</td>
+                        <td><span class="badge bg-light text-secondary border">${field.key}</span></td>
+                        <td>${field.type}</td>
+                        <td class="text-end">
+                            <button class="btn btn-sm text-danger" onclick="deleteCustomField(${index})"><i class="fa-solid fa-trash"></i></button>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            // Optional: Show System fields as disabled rows to inform user
+            // appData.systemFields.forEach(f => ... render disabled row ...);
+        }
+
+        function addCustomField() {
+            Swal.fire({
+                title: 'เพิ่มหัวข้อใหม่',
+                html: `
+                    <input id="swal-label" class="form-control mb-2" placeholder="ชื่อหัวข้อ (เช่น แพทย์เจ้าของไข้)">
+                    <select id="swal-type" class="form-select mb-2">
+                        <option value="text">ข้อความสั้น (Text)</option>
+                        <option value="number">ตัวเลข (Number)</option>
+                        <option value="date">วันที่ (Date)</option>
+                    </select>
+                `,
+                showCancelButton: true,
+                confirmButtonText: 'เพิ่ม',
+                preConfirm: () => {
+                    const label = document.getElementById('swal-label').value;
+                    const type = document.getElementById('swal-type').value;
+                    if(!label) Swal.showValidationMessage('กรุณาระบุชื่อหัวข้อ');
+                    return { label, type };
+                }
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    const { label, type } = result.value;
+                    // Auto-generate key from label (simple logic)
+                    const key = 'custom_' + Date.now(); 
+                    
+                    appData.customFields.push({
+                        id: Date.now(),
+                        label: label,
+                        key: key,
+                        type: type,
+                        col: 6, // Default width
+                        required: false
+                    });
+                    saveLocal();
+                    renderFieldsTable();
+                    Swal.fire('สำเร็จ', 'เพิ่มหัวข้อเรียบร้อย อย่าลืมกดบันทึกข้อมูลในหน้าแบบฟอร์มเพื่อทดสอบ', 'success');
+                }
+            });
+        }
+
+        function deleteCustomField(index) {
+            Swal.fire({
+                title: 'ยืนยันการลบ?',
+                text: 'ข้อมูลเก่าที่เคยบันทึกไว้ในหัวข้อนี้จะยังคงอยู่ใน Database แต่จะไม่แสดงในหน้าฟอร์ม',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                confirmButtonText: 'ลบหัวข้อ'
+            }).then((result) => {
+                if(result.isConfirmed) {
+                    appData.customFields.splice(index, 1);
+                    saveLocal();
+                    renderFieldsTable();
+                }
+            });
+        }
+
+        // ---------------- Handle Record Saving ----------------
+        function handleSaveRecord(e) {
+            e.preventDefault();
+            
+            // Gather data dynamically based on current form
+            const formData = new FormData(e.target);
+            const dataObj = {};
+            formData.forEach((value, key) => {
+                dataObj[key] = value;
+            });
+
+            Swal.fire({ title: 'กำลังบันทึก...', didOpen: () => Swal.showLoading() });
+
+            if (IS_GAS_ENV) {
+                google.script.run.withSuccessHandler(() => {
+                    Swal.fire('สำเร็จ', 'บันทึกเรียบร้อย', 'success');
+                    e.target.reset();
+                    initDateFields();
+                    updateRecentTable();
+                }).saveData(dataObj); // Send Dynamic Object
+            } else {
+                setTimeout(() => {
+                    appData.records.push(dataObj);
+                    saveLocal();
+                    Swal.fire('สำเร็จ', 'บันทึกเรียบร้อย (Demo)', 'success');
+                    e.target.reset();
+                    initDateFields();
+                    updateRecentTable();
+                }, 800);
+            }
+        }
+
+        function updateRecentTable() {
+            const thead = document.getElementById('recentTableHead');
+            const tbody = document.querySelector('#recentTable tbody');
+            
+            // Build Header Dynamic
+            // Show only System Fields + maybe first 2 Custom fields to save space
+            const showFields = [...appData.systemFields]; 
+            // Optional: Add custom fields to table header if needed
+            // showFields.push(...appData.customFields);
+
+            let headerHtml = '<tr>';
+            showFields.forEach(f => headerHtml += `<th>${f.label}</th>`);
+            headerHtml += '</tr>';
+            thead.innerHTML = headerHtml;
+
+            tbody.innerHTML = '<tr class="text-center"><td colspan="100%"><div class="spinner-border text-primary" role="status"></div></td></tr>';
+
+            const renderRows = (data) => {
+                tbody.innerHTML = '';
+                const recent = data.slice().reverse().slice(0, 10);
+                recent.forEach(row => {
+                    let tr = '<tr>';
+                    showFields.forEach(f => {
+                        let val = row[f.key] || '-';
+                        if(f.key === 'status') {
+                            const cls = val === 'Admit' ? 'bg-admit' : 'bg-discharge';
+                            val = `<span class="badge-status ${cls}">${val}</span>`;
+                        }
+                        tr += `<td>${val}</td>`;
+                    });
+                    tr += '</tr>';
+                    tbody.innerHTML += tr;
+                });
+            };
+
+            if(IS_GAS_ENV) {
+                google.script.run.withSuccessHandler(renderRows).getRecentData();
+            } else {
+                setTimeout(() => renderRows(appData.records), 300);
+            }
+        }
+
+        // ---------------- Dashboard & Stats ----------------
+        function updateDashboard() {
+            // Calculate Stats (Using fixed keys 'status' and 'type' for graphs)
+            const data = appData.records;
+            const total = data.length;
+            const admit = data.filter(d => d.status === 'Admit').length;
+            const discharge = data.filter(d => d.status === 'Discharge').length;
+
+            document.getElementById("stat-total").innerText = total;
+            document.getElementById("stat-admit").innerText = admit;
+            document.getElementById("stat-discharge").innerText = discharge;
+
+            // Graphs
+            const ctxMain = document.getElementById('mainChart').getContext('2d');
+            const ctxPie = document.getElementById('pieChart').getContext('2d');
+            
+            if (mainChartInstance) mainChartInstance.destroy();
+            if (pieChartInstance) pieChartInstance.destroy();
+
+            // Pie Data (Type)
+            const typeCounts = {};
+            data.forEach(d => { if(d.type) typeCounts[d.type] = (typeCounts[d.type] || 0) + 1; });
+
+            // Bar Data (Simple Mock for months)
+            const labels = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.'];
+            
+            mainChartInstance = new Chart(ctxMain, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: 'รับใหม่', data: [10, 15, 8, 12, 5, 8], backgroundColor: '#66bb6a', borderRadius: 5 },
+                        { label: 'จำหน่าย', data: [5, 8, 12, 7, 3, 5], backgroundColor: '#ffa726', borderRadius: 5 }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+            });
+
+            pieChartInstance = new Chart(ctxPie, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(typeCounts),
+                    datasets: [{
+                        data: Object.values(typeCounts),
+                        backgroundColor: ['#42a5f5', '#ef5350', '#ffca28', '#ab47bc', '#26a69a'],
+                        borderWidth: 0
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
+            });
+        }
+
+        // ---------------- User & Category Utils ----------------
+        // (Similar to previous version but integrated into this logic)
+        function renderUserTable() {
+            const tbody = document.querySelector('#usersTable tbody');
+            tbody.innerHTML = '';
+            appData.users.forEach(u => {
+                tbody.innerHTML += `<tr><td>${u.name}</td><td>${u.username}</td><td class="text-end"><button class="btn btn-sm btn-outline-danger" onclick="deleteUser(${u.id})"><i class="fa-solid fa-trash"></i></button></td></tr>`;
+            });
+        }
+        function openUserModal() {
+            Swal.fire({
+                title: 'เพิ่มผู้ใช้',
+                html: '<input id="swal-u-name" class="form-control mb-2" placeholder="ชื่อ"><input id="swal-u-user" class="form-control mb-2" placeholder="User"><input id="swal-u-pass" class="form-control" placeholder="Pass">',
+                preConfirm: () => {
+                    return {
+                        name: document.getElementById('swal-u-name').value,
+                        username: document.getElementById('swal-u-user').value,
+                        password: document.getElementById('swal-u-pass').value
+                    }
+                }
+            }).then((res) => {
+                if(res.isConfirmed) {
+                    appData.users.push({ id: Date.now(), ...res.value });
+                    saveLocal(); renderUserTable();
+                }
+            });
+        }
+        function deleteUser(id) { appData.users = appData.users.filter(u => u.id !== id); saveLocal(); renderUserTable(); }
+        
+        function renderCategoryList() {
+            const list = document.getElementById('categoryList');
+            list.innerHTML = '';
+            appData.categories.forEach((c, idx) => {
+                list.innerHTML += `<li class="list-group-item d-flex justify-content-between">${c} <i class="fa-solid fa-trash text-danger cursor-pointer" onclick="deleteCategory(${idx})"></i></li>`;
+            });
+        }
+        function addCategory() {
+            const v = document.getElementById('newCategory').value;
+            if(v) { appData.categories.push(v); saveLocal(); renderCategoryList(); document.getElementById('newCategory').value=''; }
+        }
+        function deleteCategory(idx) { appData.categories.splice(idx, 1); saveLocal(); renderCategoryList(); }
+
+    </script>
+</body>
+</html>
