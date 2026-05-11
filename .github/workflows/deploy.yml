@@ -12,9 +12,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: clasp push
-        uses: google/clasp-action@main
+- name: clasp push
+        # แก้ไขบรรทัดข้างล่างนี้
+        uses: google/clasp-action@main 
         with:
           command: push
           scriptId: ${{ secrets.SCRIPT_ID }}
+          # ตรวจสอบให้แน่ใจว่าใช้ชื่อ secrets ตรงกับที่ตั้งไว้
           claspToken: ${{ secrets.CLASP_TOKEN }}
