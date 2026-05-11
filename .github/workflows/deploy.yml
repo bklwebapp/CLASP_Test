@@ -1,0 +1,20 @@
+name: Deploy to Google Apps Script
+
+on:
+  push:
+    branches:
+      - main  # หรือชื่อ Branch ที่คุณใช้งาน
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: clasp push
+        uses: google/clasp-action@v2
+        with:
+          command: push
+          scriptId: ${{ secrets.SCRIPT_ID }}
+          claspToken: ${{ secrets.CLASP_TOKEN }}
