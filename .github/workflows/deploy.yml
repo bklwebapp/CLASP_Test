@@ -13,7 +13,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: clasp push
-        uses: google/clasp-action@v2
+        uses: google/clasp-action@main
         with:
           command: push
           scriptId: ${{ secrets.SCRIPT_ID }}
